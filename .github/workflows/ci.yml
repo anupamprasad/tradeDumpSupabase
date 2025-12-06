@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, stage ]
+  pull_request:
+    branches: [ main, stage ]
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install flake8
+
+      - name: Syntax check (compile)
+        run: python -m compileall .
+
+      - name: Lint (flake8)
+        run: |
+          echo "Running flake8..."
+          flake8 || true
+
+      - name: Run tests (if present)
+        run: |
+          if [ -d tests ] || [ -f pytest.ini ]; then
+            pip install pytest
+            pytest -q
+          else
+            echo "No tests found - skipping"
+          fi
+
+  # The Streamlit Cloud service automatically redeploys on push to the connected branch.
+  # This job exists to provide an explicit step after the tests succeed.
+  post-deploy-notify:
+    name: Post CI
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: CI Passed - Log
+        run: |
+          echo "CI passed for commit $GITHUB_SHA on branch ${GITHUB_REF#refs/heads/}."
+          echo "If Streamlit Cloud is connected to this repo/branch it will auto-deploy on push."
