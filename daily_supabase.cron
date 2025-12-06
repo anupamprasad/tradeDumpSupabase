@@ -1,6 +1,6 @@
-# Crontab entry to run daily_supabase_dump.py at 7:30 AM daily
+# Crontab entry to run daily_supabase_dump.py at 4:30 PM daily
 # Save/install with: crontab /path/to/daily_supabase.cron
 
 # Move to project dir (so .env is loaded), ensure scheduler is disabled for cron runs,
 # and use the virtualenv Python for a clean environment. Output is appended to cron.log.
-30 7 * * * cd /Users/anupamprasad/Documents/Python File && ENABLE_SCHEDULER=0 /Users/anupamprasad/Documents/Python File/.venv/bin/python3 /Users/anupamprasad/Documents/Python File/daily_supabase_dump.py >> /Users/anupamprasad/Documents/Python File/cron.log 2>&1
+30 16 * * * cd /Users/anupamprasad/Documents/Python File && ENABLE_SCHEDULER=0 /Users/anupamprasad/Documents/Python File/.venv/bin/python3 /Users/anupamprasad/Documents/Python File/daily_supabase_dump.py >> /Users/anupamprasad/Documents/Python File/cron.log 2>&1
