@@ -1,0 +1,6 @@
+.venv/
+cron.log
+.env
+__pycache__/
+*.pyc
+daily_stock_data/
