@@ -1,0 +1,3 @@
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_API_KEY=your_service_role_key
+SUPABASE_TABLE=stock_prices
