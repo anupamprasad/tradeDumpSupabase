@@ -32,11 +32,48 @@ SUPABASE_API_KEY=your_api_key
 
 ## 🎯 Usage
 
+### Step 1: Generate Forecasts
+
 Run the forecast script:
 
 ```bash
 python3 stock_price_forecast.py
 ```
+
+This generates CSV files with predictions from all available methods.
+
+### Step 2: Visualize Forecasts
+
+**Option A: Interactive HTML Charts (Standalone)**
+
+```bash
+python3 forecast_visualizations.py
+```
+
+This generates interactive HTML files that you can open in any browser.
+
+**Option B: Streamlit Dashboard (Recommended)**
+
+```bash
+streamlit run forecast_dashboard.py
+```
+
+Access at: `http://localhost:8501`
+
+## 📊 Visualization Features
+
+### Interactive HTML Charts
+- Multi-method comparison for each stock
+- Detailed forecast with confidence intervals
+- Price change visualizations
+- Complete overview grid
+
+### Streamlit Dashboard
+- **Comparison Tab**: Compare all forecasting methods side-by-side
+- **Details Tab**: Deep dive into individual method forecasts
+- **Changes Tab**: Analyze predicted price movements
+- **Data Tab**: View and download raw forecast data
+- Real-time filters for symbols and methods
 
 ## 📁 Output Files
 
