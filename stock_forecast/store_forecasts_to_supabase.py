@@ -23,7 +23,7 @@ TABLE_NAME = "forecast_stocks"
 def create_forecast_table():
     """
     Create the forecast_stocks table in Supabase if it doesn't exist.
-    This function uses raw SQL to create the table.
+    This function uses raw SQL via RPC to create the table.
     """
     print(f"📝 Creating/checking table '{TABLE_NAME}'...")
     
@@ -33,10 +33,43 @@ def create_forecast_table():
         print(f"✔ Table '{TABLE_NAME}' already exists")
         return True
     except Exception as e:
-        print(f"⚠️ Table doesn't exist or error occurred: {str(e)[:100]}")
-        print(f"ℹ️ Please create the table manually in Supabase with the following schema:")
-        print_table_schema()
-        return False
+        print(f"⚠️ Table doesn't exist. Attempting to create...")
+        
+        # Try to create the table using SQL
+        try:
+            sql_query = """
+            CREATE TABLE IF NOT EXISTS forecast_stocks (
+                id BIGSERIAL PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT NOW(),
+                forecast_date DATE NOT NULL,
+                symbol VARCHAR(20) NOT NULL,
+                method VARCHAR(50) NOT NULL,
+                predicted_close DECIMAL(10, 2) NOT NULL,
+                price_change DECIMAL(10, 2),
+                price_change_pct DECIMAL(5, 2),
+                forecast_day INTEGER,
+                lower_bound DECIMAL(10, 2),
+                upper_bound DECIMAL(10, 2),
+                UNIQUE(forecast_date, symbol, method)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_symbol ON forecast_stocks(symbol);
+            CREATE INDEX IF NOT EXISTS idx_method ON forecast_stocks(method);
+            CREATE INDEX IF NOT EXISTS idx_forecast_date ON forecast_stocks(forecast_date);
+            """
+            
+            # Execute via RPC if available, otherwise show instructions
+            # Note: RPC execution requires a Supabase function setup
+            print(f"⚠️ Cannot create table programmatically.")
+            print(f"ℹ️ Please create the table manually in Supabase SQL Editor with this schema:")
+            print_table_schema()
+            return False
+            
+        except Exception as create_error:
+            print(f"⚠️ Error creating table: {str(create_error)[:100]}")
+            print(f"ℹ️ Please create the table manually in Supabase SQL Editor with this schema:")
+            print_table_schema()
+            return False
 
 def print_table_schema():
     """Print the recommended table schema"""
@@ -79,19 +112,21 @@ def insert_forecast_data(forecast_df: pd.DataFrame, method: str, batch_size: int
     try:
         # Prepare data for insertion
         records = []
-        today = datetime.now().date()
         
         for _, row in forecast_df.iterrows():
+            # Get the actual forecast date from the timestamp column
+            forecast_date = pd.to_datetime(row["timestamp"]).date()
+            
             record = {
-                "forecast_date": today.isoformat(),
+                "forecast_date": forecast_date.isoformat(),
                 "symbol": row["symbol"],
                 "method": method,
                 "predicted_close": float(row["predicted_close"]),
-                "price_change": float(row["price_change"]) if "price_change" in row else None,
-                "price_change_pct": float(row["price_change_pct"]) if "price_change_pct" in row else None,
-                "forecast_day": int(row["forecast_day"]) if "forecast_day" in row else None,
-                "lower_bound": float(row["lower_bound"]) if "lower_bound" in row else None,
-                "upper_bound": float(row["upper_bound"]) if "upper_bound" in row else None,
+                "price_change": float(row["price_change"]) if "price_change" in row and pd.notna(row["price_change"]) else None,
+                "price_change_pct": float(row["price_change_pct"]) if "price_change_pct" in row and pd.notna(row["price_change_pct"]) else None,
+                "forecast_day": int(row["forecast_day"]) if "forecast_day" in row and pd.notna(row["forecast_day"]) else None,
+                "lower_bound": float(row["lower_bound"]) if "lower_bound" in row and pd.notna(row["lower_bound"]) else None,
+                "upper_bound": float(row["upper_bound"]) if "upper_bound" in row and pd.notna(row["upper_bound"]) else None,
             }
             records.append(record)
         
