@@ -86,6 +86,55 @@ The script generates the following files:
 - `forecast_{symbol}_{method}.csv` - Individual forecast files per stock and method
 - `forecast_comparison.csv` - Comparison of all methods across all stocks
 
+## 💾 Store Forecasts to Supabase
+
+After generating forecasts, store them in the `forecast_stocks` table:
+
+### Step 1: Create Supabase Table
+
+Run the storage script which will guide you:
+
+```bash
+python3 store_forecasts_to_supabase.py
+```
+
+This will attempt to create the table automatically. If manual creation is needed, use the provided SQL schema from the script output.
+
+### Step 2: Available Commands
+
+```bash
+# Store all forecasts to Supabase
+python3 store_forecasts_to_supabase.py store
+
+# Query forecasts (with optional filters)
+python3 store_forecasts_to_supabase.py query AAPL linear
+
+# Display summary of stored forecasts
+python3 store_forecasts_to_supabase.py display
+
+# Delete forecasts older than N days
+python3 store_forecasts_to_supabase.py clear 14
+```
+
+### Table Schema
+
+```sql
+CREATE TABLE forecast_stocks (
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT NOW(),
+    forecast_date DATE NOT NULL,
+    symbol VARCHAR(20) NOT NULL,
+    method VARCHAR(50) NOT NULL,
+    predicted_close DECIMAL(10, 2) NOT NULL,
+    price_change DECIMAL(10, 2),
+    price_change_pct DECIMAL(5, 2),
+    forecast_day INTEGER,
+    lower_bound DECIMAL(10, 2),
+    upper_bound DECIMAL(10, 2),
+    UNIQUE(forecast_date, symbol, method)
+);
+```
+
 ## 🔧 Method Details
 
 ### Linear Regression
