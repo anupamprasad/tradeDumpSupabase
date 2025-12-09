@@ -6,6 +6,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import HistGradientBoostingRegressor
 import warnings
 
 # Advanced forecasting imports
@@ -266,6 +267,97 @@ def forecast_prophet(df: pd.DataFrame, symbol: str, days: int = 7) -> pd.DataFra
         print(f"❌ Error in Prophet forecast {symbol}: {e}")
         return pd.DataFrame()
 
+
+# ============= Forecast Using Gradient Boosting (Feature-based) =============
+def forecast_gradient_boost(df: pd.DataFrame, symbol: str, days: int = 7, lags: int = 7) -> pd.DataFrame:
+    """
+    Forecast using a feature-based Gradient Boosting regressor.
+    Builds lag features, rolling stats and simple calendar features and predicts iteratively.
+    Uses scikit-learn's HistGradientBoostingRegressor for speed and robustness.
+    """
+    # Minimum data requirement for reliable GB model
+    min_points = max(20, lags * 3)
+    if df.empty or len(df) < min_points:
+        print(f"⚠️ Insufficient data for Gradient Boost {symbol} (need at least {min_points} points)")
+        return pd.DataFrame()
+
+    try:
+        df = df.sort_values("timestamp").reset_index(drop=True)
+        prices = df["close"].astype(float).reset_index(drop=True)
+
+        # Build supervised dataset with lag features
+        X_rows = []
+        y = []
+        for i in range(lags, len(prices)):
+            row = {}
+            # lag features
+            for lag in range(1, lags + 1):
+                row[f"lag_{lag}"] = prices.iloc[i - lag]
+
+            window = prices.iloc[max(0, i - 14):i]
+            row["rolling_mean_7"] = window.tail(7).mean() if len(window) >= 7 else window.mean()
+            row["rolling_std_7"] = window.tail(7).std() if len(window) >= 7 else window.std()
+
+            ts = df["timestamp"].iloc[i]
+            row["day_of_week"] = ts.dayofweek
+            row["day_of_month"] = ts.day
+
+            X_rows.append(row)
+            y.append(prices.iloc[i])
+
+        X = pd.DataFrame(X_rows)
+        y = np.array(y)
+
+        # Train/Test split: use all for training (we forecast future days)
+        model = HistGradientBoostingRegressor(max_iter=200)
+        model.fit(X, y)
+
+        # Iterative forecasting
+        last_prices = prices.tolist()
+        last_timestamp = df["timestamp"].iloc[-1]
+        future_dates = []
+        preds = []
+
+        for step in range(days):
+            # build features for next day
+            feat = {}
+            for lag in range(1, lags + 1):
+                # fetch from the end of last_prices
+                feat[f"lag_{lag}"] = last_prices[-lag]
+
+            window = pd.Series(last_prices[-14:])
+            feat["rolling_mean_7"] = window.tail(7).mean() if len(window) >= 7 else window.mean()
+            feat["rolling_std_7"] = window.tail(7).std() if len(window) >= 7 else window.std()
+
+            next_date = last_timestamp + timedelta(days=step + 1)
+            feat["day_of_week"] = next_date.dayofweek
+            feat["day_of_month"] = next_date.day
+
+            X_next = pd.DataFrame([feat])
+            pred = model.predict(X_next)[0]
+            preds.append(pred)
+
+            # append predicted price to last_prices for next-step features
+            last_prices.append(float(pred))
+            future_dates.append(next_date)
+
+        last_price = prices.iloc[-1]
+        forecast_df = pd.DataFrame({
+            "timestamp": future_dates,
+            "symbol": symbol,
+            "predicted_close": preds,
+            "forecast_day": [i + 1 for i in range(days)]
+        })
+
+        forecast_df["price_change"] = forecast_df["predicted_close"] - last_price
+        forecast_df["price_change_pct"] = (forecast_df["price_change"] / last_price) * 100
+
+        return forecast_df
+
+    except Exception as e:
+        print(f"❌ Error in Gradient Boost forecast {symbol}: {e}")
+        return pd.DataFrame()
+
 # ============= Main Forecasting Function =============
 def generate_forecast(symbol: str, days: int = 7, method: str = "linear") -> pd.DataFrame:
     """
@@ -296,8 +388,10 @@ def generate_forecast(symbol: str, days: int = 7, method: str = "linear") -> pd.
         forecast_df = forecast_arima(df, symbol, days)
     elif method == "prophet":
         forecast_df = forecast_prophet(df, symbol, days)
+    elif method == "gradient_boost":
+        forecast_df = forecast_gradient_boost(df, symbol, days)
     else:
-        print(f"❌ Unknown method: {method}. Available: linear, moving_average, arima, prophet")
+        print(f"❌ Unknown method: {method}. Available: linear, moving_average, arima, prophet, gradient_boost")
         return pd.DataFrame()
     
     if not forecast_df.empty:
@@ -337,6 +431,9 @@ if __name__ == "__main__":
     
     if PROPHET_AVAILABLE:
         METHODS.append("prophet")
+    
+    # Add gradient boost method (feature-based)
+    METHODS.append("gradient_boost")
     
     print("=" * 70)
     print("📈 Stock Price Forecast - 7 Days")
